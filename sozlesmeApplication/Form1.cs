@@ -9,6 +9,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
@@ -889,6 +890,7 @@ namespace sozlesmeApplication
                     pesinAyar(doc);
                     takasAyar(doc);
                     FindAndUpdateTaksitTable(taksitSayisi, doc);
+                    SenetOlustur();
                     break;
                 case 2:
                     pesinAyar(doc);
@@ -897,10 +899,12 @@ namespace sozlesmeApplication
                 case 3:
                     pesinAyar(doc);
                     FindAndUpdateTaksitTable(taksitSayisi, doc);
+                    SenetOlustur();
                     break;
                 case 4:
                     takasAyar(doc);
                     FindAndUpdateTaksitTable(taksitSayisi, doc);
+                    SenetOlustur();
                     break;
                 case 5:
                     pesinAyar(doc);
@@ -910,6 +914,7 @@ namespace sozlesmeApplication
                     break;
                 case 7:
                     FindAndUpdateTaksitTable(taksitSayisi, doc);
+                    SenetOlustur();
                     break;
                 default:
                     break;
@@ -1010,7 +1015,6 @@ namespace sozlesmeApplication
 
                 doc.SaveAs2(Path.Combine(kullanilanSozlesmelerYolu, fileName));
                 doc.SaveAs2(Path.Combine(sozlesmeArsiviYolu, fileName));
-
             }
             catch (System.Runtime.InteropServices.COMException ex)
             {
@@ -2586,6 +2590,217 @@ namespace sozlesmeApplication
         private void yeniSozlesmeButton_Click(object sender, EventArgs e)
         {
             yeniSozlesme();
+        }
+
+
+        public void SenetOlustur()
+        {
+            object missing = Missing.Value;
+
+            // Halihazırda var olan şablon dosyanızın yolunu belirtin
+            object templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Word", "ihtimaller", "senetSablon.docx");
+
+            //templatePath = templatePath + @"\senetSablon.docx";
+
+            //object templatePath = @"C:\Users\mami\Desktop\aa.docx";
+
+            int taksitSayisi;
+            if (int.TryParse(taksitSayisiComboBox.Text, out taksitSayisi))
+            {
+
+            }
+
+            // Kaç adet kopya oluşturulacak
+            int copyCount = taksitSayisi;
+
+            // Word uygulamasını başlat
+            Application wordApp = new Application();
+            wordApp.Visible = false; // Arka planda çalışsın
+
+            // Şablonu aç
+            Document doc = wordApp.Documents.Open(
+                ref templatePath
+            );
+            string fileName = "";
+            try
+            {
+                // Şablonun tamamını (içeriğini) al
+                Range docRange = doc.Content;
+                docRange.Copy(); // Panoya kopyala
+
+                // Mevcut dokümanda zaten 1 adet şablon var; geri kalan kopyalar eklenir.
+                for (int i = 1; i < copyCount; i++)
+                {
+                    // İmleci belgenin sonuna taşı
+                    Range endRange = doc.Content;
+                    endRange.Collapse(WdCollapseDirection.wdCollapseEnd);
+
+                    // Şablonlar arasında 1 satır boşluk
+                    endRange.InsertParagraphAfter();
+                    endRange.Collapse(WdCollapseDirection.wdCollapseEnd);
+
+                    // Tabloyu yapıştır
+                    endRange.Paste();
+
+                    // Yeni eklenen tabloyu bul (son tablo)
+                    Table lastTable = doc.Tables[doc.Tables.Count];
+
+                    // Satırların sayfa bölünmesine izin vermeyelim (tek parça durması için)
+                    lastTable.Rows.AllowBreakAcrossPages = 0;
+
+                    string aliciAdSoyadUnvan = "";
+                    if (unvanTextBox.Text == "")
+                    {
+                        aliciAdSoyadUnvan = adSoyadTextBox.Text;
+                    }
+                    else
+                    {
+                        aliciAdSoyadUnvan = unvanTextBox.Text;
+                    }
+
+                    string aliciAdres = adresTextBox.Text;
+
+                    string aliciTcnVn = "";
+
+                    if (vnTextBox.Text == "")
+                    {
+                        try
+                        {
+                            aliciTcnVn = tcknTextBox.Text.Substring(0, 11);
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            MessageBox.Show("Lütfen TC kimlik numarasının doğru girildiğinden emin olunuz.");
+                        }
+                    }
+                    else if (tcknTextBox.Text == "")
+                    {
+                        try
+                        {
+                            aliciTcnVn = vergiDairesiTextBox.Text + "/" + vnTextBox.Text.Substring(0, 10);
+                        }
+                        catch (ArgumentOutOfRangeException)
+                        {
+                            MessageBox.Show("Lütfen vergi numarasının doğru girildiğinden emin olunuz.");
+                        }
+                    }
+
+                    string sUnvan = "", sVDVN = "", sMersis = "", sAdres = "";
+                    if (saticiComboBox.Text == "Bereketli Topraklar")
+                    {
+                        sUnvan = "BEREKETLİ EMLAK SANAYİ VE TİCARET ANONİM ŞİRKETİ";
+                    }
+                    else if (saticiComboBox.Text == "BT Meta İnşaat")
+                    {
+                        sUnvan = "BT META İNŞAAT SANAYİ VE TİCARET ANONİM ŞİRKETİ";
+                    }
+                    else if (saticiComboBox.Text == "Bilal Aktaş")
+                    {
+                        sUnvan = "BİLAL AKTAŞ";
+                    }
+
+                    foreach (ContentControl control in doc.ContentControls)
+                    {
+                        if (control.Tag == "kesideTarihi")
+                        {
+                            control.Range.Text = sozlesmeTarihiDateTimePicker.Value.ToString("dd'/'MM'/'yyyy");
+                        }
+                        if (control.Tag == "borcluAdUnvan")
+                        {
+                            control.Range.Text = aliciAdSoyadUnvan;
+                        }
+                        if (control.Tag == "borcluAdres")
+                        {
+                            control.Range.Text = aliciAdres;
+                        }
+                        if (control.Tag == "borcluTcNo")
+                        {
+                            control.Range.Text = aliciTcnVn;
+                        }
+                        if (control.Tag == "saticiUnvan")
+                        {
+                            control.Range.Text = sUnvan;
+                        }
+                    }
+                    int countTaksitTarihi = 0;
+                    foreach (ContentControl control in doc.ContentControls)
+                    {
+                        if (control.Tag == "odemeTarihi")
+                        {
+                            control.Range.Text = dtpList[countTaksitTarihi].Value.ToString("dd'/'MM'/'yyyy");
+                            countTaksitTarihi++;
+                        }
+                    }
+
+                    int countTaksitTutari = 0;
+                    foreach (ContentControl control in doc.ContentControls)
+                    {
+                        if (control.Tag == "senetUcret")
+                        {
+                            control.Range.Text = OndalikVarMi((int)decimal.Parse(taksitTutariComponentList[countTaksitTutari].Text)) + ",00";
+                            countTaksitTutari++;
+                        }
+                    }
+
+                    int countTaksitTutariYaziyla = 0;
+                    foreach (ContentControl control in doc.ContentControls)
+                    {
+                        if (control.Tag == "yaziylaSenetUcret")
+                        {
+                            string yaziyla = NumberToCurrencyText((int)decimal.Parse(taksitTutariComponentList[countTaksitTutariYaziyla].Text));
+                            yaziyla = yaziyla.Substring(0, yaziyla.Length - 1);
+                            control.Range.Text = yaziyla;
+                            countTaksitTutariYaziyla++;
+                        }
+                    }
+
+                    int countSenetNo = 1;
+                    foreach (ContentControl control in doc.ContentControls)
+                    {
+                        if (control.Tag == "senetNo")
+                        {
+                            if (countSenetNo < 10)
+                            {
+                                control.Range.Text = "0" + countSenetNo.ToString();
+                            }
+                            else
+                            {
+                                control.Range.Text = countSenetNo.ToString();
+                            }
+                            countSenetNo++;
+                        }
+                    }
+
+                    foreach (Row row in lastTable.Rows)
+                    {
+                        row.Range.ParagraphFormat.KeepTogether = -1;  // (True)
+                        row.Range.ParagraphFormat.KeepWithNext = -1;  // (True)
+                    }
+
+                    fileName = aliciAdSoyadUnvan + " - " + sozlesmeTarihiDateTimePicker.Value.ToString("dd-MM-yyyy") + " - Senet - Satış Sözleşmesi.docx";
+                }
+
+                doc.SaveAs2(Path.Combine(kullanilanSozlesmelerYolu, fileName));
+                doc.SaveAs2(Path.Combine(sozlesmeArsiviYolu, fileName));
+            }
+            catch (Exception ex)
+            {
+                decimal taksitTutari;
+                if (decimal.TryParse(taksitTutariTextBox.Text, out taksitTutari))
+                {
+                    MessageBox.Show("Hata oluştu: " + ex.StackTrace);
+                }
+                else
+                {
+                    MessageBox.Show("Taksit tutarı doğru biçimde girilmedi.");
+                }
+            }
+            finally
+            {
+                // Açık belgeyi ve Word uygulamasını kapat
+                doc.Close(false, ref missing, ref missing);
+                wordApp.Quit(ref missing, ref missing, ref missing);
+            }
         }
     }
 }
